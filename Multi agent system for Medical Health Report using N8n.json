@@ -1,0 +1,426 @@
+{
+  "name": "Multi agent system for Medical Health Report using N8n",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Medical Health Report Analyzer",
+        "formDescription": "Upload your medical report to get AI-based health summary, doctor recommendations, appointment booking, and personalized health advice.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Patient Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone Number",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Location",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Preferred Appointment Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Preferred Appointment Time",
+              "placeholder": "10:30 AM",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Medical Department",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Cardiology"
+                  },
+                  {
+                    "option": "Neurology"
+                  },
+                  {
+                    "option": "Orthopedics"
+                  },
+                  {
+                    "option": "Dermatology"
+                  },
+                  {
+                    "option": "General Medicine"
+                  },
+                  {
+                    "option": "ENT Specialist"
+                  },
+                  {
+                    "option": "Pulmonology"
+                  },
+                  {
+                    "option": "Gastroenterology"
+                  },
+                  {
+                    "option": "Psychiatry"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Upload Medical Report",
+              "fieldType": "file",
+              "acceptFileTypes": "PDF, DOCX, PNG, JPG, JPEG, TXT",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Your medical report has been submitted successfully. Our AI healthcare system is analyzing your report."
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -720,
+        -32
+      ],
+      "id": "9faa07d6-a0d1-414a-a2fb-6a5c7d7d0c1b",
+      "name": "On form submission",
+      "webhookId": "b6428a7f-5088-4ae3-ba83-1609e756b1d4"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        304
+      ],
+      "id": "31e36c3e-0620-4aa1-b6e9-9cc7c27cc8de",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "3YQQ4E5wRdhnD1EO",
+          "name": "Groq account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI medical health report analyzer.\n\nAnalyze this patient case.\n\nReturn ONLY valid JSON in this format:\n\n{\n  \"summary\": \"\",\n  \"key_findings\": [\n    \"\",\n    \"\"\n  ],\n  \"condition_classification\": \"\",\n  \"recommended_department\": \"\",\n  \"important_warnings\": [\n    \"\",\n    \"\"\n  ],\n  \"doctor_search_query\": \"\"\n}\n\nPatient details:\nName: {{$json.Patient_Name}}\nLocation: {{$json.Location}}\n\nMedical symptoms:\nPatient has sinus infection, throat pain, fever, cough and nasal congestion for 5 days.",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an AI medical health report analyzer.  Analyze the patient's report carefully.  Patient details: Name: {{$json.Patient_Name}} Location: {{$json.Location}}  Return: 1. Summary 2. Key Findings 3. Condition Classification (Critical/Mild/Normal) 4. Recommended Medical Department 5. Important Warnings  Keep response simple and structured. Do not prescribe medicines."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "Patient has sinus infection, throat pain, fever, cough and nasal congestion for 5 days."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -480,
+        -48
+      ],
+      "id": "188b85bc-53a4-48ee-b4c1-ba7787c7853a",
+      "name": "Medical Health Report Analyzer"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text;\n\nconst cleaned = raw\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\nreturn [\n  {\n    json: JSON.parse(cleaned)\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -48
+      ],
+      "id": "62f4787f-24a7-44f3-a082-417b15be48f3",
+      "name": "clean Medical Report"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content_Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"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\",\n  \"query\": \"{{$json.doctor_search_query}}\",\n  \"search_depth\": \"basic\",\n  \"include_answer\": true,\n  \"max_results\": 5\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        128,
+        -48
+      ],
+      "id": "aacaa025-cbbf-423a-9282-373438f18652",
+      "name": "Doctor Recommendation Agent"
+    },
+    {
+      "parameters": {
+        "sendTo": "faizansayeed97@gmail.com",
+        "subject": "Medical Appointment Confirmation",
+        "message": "=<h2>Medical Appointment Confirmation</h2>  <p>Hello,</p>  <p>Your medical report has been analyzed successfully.</p>  <h3>Doctor Recommendation</h3> <p>{{$json.answer}}</p>  <h3>Top Doctor Result</h3> <p><b>{{$json.results[0].title}}</b></p> <p>{{$json.results[0].content}}</p> <p>Link: {{$json.results[0].url}}</p>  <p>Please consult a qualified doctor before taking any medical decision.</p>  <p>Thank you,<br>AI Medical Health Report System</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        -48
+      ],
+      "id": "3a5ac1b6-7f1a-4827-9392-b11b2e7f3ce8",
+      "name": "Appointment Confirmation Email",
+      "webhookId": "2533f14c-1f8c-4011-a3f1-8f7a5d29796d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "skD4BvaR73UnzPjA",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        -32
+      ],
+      "id": "0952b953-fa40-480e-8bff-2fdb5d48a8cd",
+      "name": "Wait",
+      "webhookId": "242c9991-b591-476a-bde7-9f5bcd04681d"
+    },
+    {
+      "parameters": {
+        "sendTo": "faizansayeed97@gmail.com",
+        "subject": "Reminder: Medical Appointment Follow-up",
+        "message": "=<h2>Appointment Reminder</h2>  <p>Hello Patient,</p>  <p>This is a reminder regarding your medical consultation.</p>  <p><b>Recommended Department:</b> {{$node[\"clean Medical Report\"].json[\"recommended_department\"]}}</p>  <p><b>Doctor Recommendation:</b></p>  <p> {{$node[\"Doctor Recommendation Agent\"].json[\"answer\"]}} </p>  <p>Please consult the doctor if symptoms continue.</p>  <p>Thank you,<br> AI Medical Health Report System</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        -32
+      ],
+      "id": "a8a0f6eb-cd5f-4761-b34c-dfa7f1798e9d",
+      "name": "Appointment Reminder Email",
+      "webhookId": "75056f4b-9868-4d1d-8164-e57f08592c60",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "skD4BvaR73UnzPjA",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        112,
+        256
+      ],
+      "id": "617f06b6-685d-45cd-bb46-0e4b1086ed0d",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "3YQQ4E5wRdhnD1EO",
+          "name": "Groq account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI healthcare lifestyle recommendation assistant.\n\nBased on the patient's medical condition, provide:\n\n1. Recommended diet\n2. Foods to avoid\n3. Exercise suggestions\n4. Daily routine improvements\n5. Water intake recommendation\n6. Sleep recommendation\n7. Stress management tips\n\nPatient Summary:\n{{$json.summary}}\n\nCondition:\n{{$json.condition_classification}}\n\nKey Findings:\n{{$json.key_findings}}\n\nDepartment:\n{{$json.recommended_department}}\n\nReturn the response in clean professional format.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        224,
+        -336
+      ],
+      "id": "9bc964ad-364a-4178-908e-faea7b4c1d24",
+      "name": "Personal Recommendation Agent"
+    },
+    {
+      "parameters": {
+        "sendTo": "faizansayeed97@gmail.com",
+        "subject": "Your Personalized Health Recommendations",
+        "message": "=<h2>Personalized Health Recommendations</h2>  <p>Hello Patient,</p>  <p>Based on your medical report, our AI generated these recommendations:</p>  <pre> {{$json.text}} </pre>  <p>Stay healthy and follow medical advice.</p>  <p>AI Medical Health Report System</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        -336
+      ],
+      "id": "95111577-aae2-4f4a-be44-3d2222ce0f44",
+      "name": "Personal Health Recommendation Email",
+      "webhookId": "33545cb2-cacf-4efb-88c2-0e74a7ab8ac4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "skD4BvaR73UnzPjA",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Medical Health Report Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Medical Health Report Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medical Health Report Analyzer": {
+      "main": [
+        [
+          {
+            "node": "clean Medical Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean Medical Report": {
+      "main": [
+        [
+          {
+            "node": "Personal Recommendation Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Doctor Recommendation Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doctor Recommendation Agent": {
+      "main": [
+        [
+          {
+            "node": "Appointment Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appointment Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Appointment Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Personal Recommendation Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personal Recommendation Agent": {
+      "main": [
+        [
+          {
+            "node": "Personal Health Recommendation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "cadd66d6-6e40-4dc8-9b3b-5e28747703cb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a636c30064636a5063d012b9b13d8adc3313a4a45e8fd973d824f400400b7841"
+  },
+  "id": "dz2hwCdoSyI0mceY",
+  "tags": []
+}
